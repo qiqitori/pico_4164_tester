@@ -28,16 +28,19 @@
 
 #define BUS_SIZE 8
 #define MAX_ERRORS 20
+#define REFRESH_EVERY_N_WRITES 4
+#define REFRESH_EVERY_N_READS 256 // 256 is the maximum for this implementation
+#define N_REFRESHES 256
 
 const unsigned int a_bus[BUS_SIZE] = {
   A0, A1, A2, A3, A4, A5, A6, A7
 };
 
-#define println printf
-// #define println(...) ;
+// #define debug_print printf
+#define debug_print(...) ;
 
 void nop(void) {
-    __asm__("nop\t\n");
+    __asm__ __volatile__( "nop\t\n");
 }
 
 void set_bus(unsigned int a) {
@@ -46,6 +49,35 @@ void set_bus(unsigned int a) {
     for (i = 0; i < BUS_SIZE; i++) {
         gpio_put(a_bus[i], a & 1);
         a >>= 1;
+    }
+}
+
+void refresh() {
+    int row;
+    for (row = 0; row < 256; row++) {
+        set_bus(row);
+        gpio_put(RAS, LOW);
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        gpio_put(RAS, HIGH);
     }
 }
 
@@ -171,25 +203,20 @@ void setup() {
     }
 }
 
-int main() {
-    int row, col;
+void test(bool start_val) {
+    int row, col, refresh_count;
     int errors = 0;
-    bool val = true;
     bool read_val = false;
+    bool val = start_val;
 
-    stdio_init_all();
-    setup();
-
-    sleep_ms(15000); // wait until /dev/ttyACM0 device is ready on host
-    println("Starting test...\n");
-
-    for (row = 0; row <= 255; row++) {
-        println("Testing row: %d\n", row);
-        for (col = 0; col <= 255; col++) {
+    for (row = 0; row < 256; row++) {
+        debug_print("Testing row: %d\n", row);
+        for (col = 0; col < 256; col++) {
+            gpio_put(STATUS_LED, val);
             write_address(row, col, val);
             read_address(row, col, &read_val);
             if (val != read_val) {
-                println("ERROR: row %d col %d read %d but expected %d\n", row, col, read_val, val);
+                printf("ERROR: row %d col %d read %d but expected %d\n", row, col, read_val, val);
                 if (++errors > MAX_ERRORS) {
                     while (true) {
                         gpio_put(STATUS_LED, HIGH);
@@ -200,14 +227,50 @@ int main() {
                 }
             }
             val = !val;
+            gpio_put(STATUS_LED, val);
+            if (col % REFRESH_EVERY_N_WRITES == 0) {
+                refresh();
+            }
         }
-        gpio_put(STATUS_LED, HIGH);
-        sleep_ms(50);
-        gpio_put(STATUS_LED, LOW);
-        sleep_ms(50);
     }
+    for (refresh_count = 0; refresh_count < N_REFRESHES; refresh_count++) {
+        printf("Refresh test %d\n", refresh_count);
+        val = start_val; // start from start_val (which determines whether we're testing 10101010... or 01010101...)
+        for (row = 0; row < 256; row++) {
+            for (col = 0; col < 256; col++) {
+                gpio_put(STATUS_LED, val);
+                read_address(row, col, &read_val);
+                if (val != read_val) {
+                    printf("ERROR: row %d col %d read %d but expected %d\n", row, col, read_val, val);
+                    if (++errors > MAX_ERRORS) {
+                        while (true) {
+                            gpio_put(STATUS_LED, HIGH);
+                            sleep_ms(50);
+                            gpio_put(STATUS_LED, LOW);
+                            sleep_ms(50);
+                        }
+                    }
+                }
+                val = !val;
+                gpio_put(STATUS_LED, val);
+                if (col % REFRESH_EVERY_N_READS == 0) {
+                    refresh();
+                }
+            }
+        }
+    }
+}
 
-    println("Test DONE. All OK!\n");
+int main() {
+    stdio_init_all();
+    setup();
+
+    sleep_ms(10000); // wait until /dev/ttyACM0 device is ready on host
+    printf("Starting 10101010... test\n");
+    test(true);
+    printf("Starting 01010101... test\n");
+    test(false);
+    printf("Test done. All OK!\n");
     while (true) {
         gpio_put(STATUS_LED, HIGH);
         sleep_ms(1000);
