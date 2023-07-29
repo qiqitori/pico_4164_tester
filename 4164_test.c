@@ -99,14 +99,14 @@ void write_address(int row, int col, bool val) {
     // Set column address
     set_bus(col);
 
+    // Pull Write LOW (Enables write)
+    gpio_put(WRITE, LOW);
+
     // Pull CAS LOW
     gpio_put(CAS, LOW);
 
     // Set Data in pin to HIGH (write a one)
     gpio_put(D, val);
-
-    // Pull Write LOW (Enables write)
-    gpio_put(WRITE, LOW);
 
     sleep_us(1);
     gpio_put(WRITE, HIGH);
