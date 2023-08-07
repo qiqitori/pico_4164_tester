@@ -78,6 +78,22 @@ void refresh() {
         nop();
         nop();
         gpio_put(RAS, HIGH);
+        // need to wait tW(RH) == 120 ns (in the case of 4164-20 chips) between RAS lows
+        // we probably have enough overhead but let's add a 120 ns delay anyway
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
+        nop();
     }
 }
 
@@ -102,11 +118,11 @@ void write_address(int row, int col, bool val) {
     // Pull Write LOW (Enables write)
     gpio_put(WRITE, LOW);
 
-    // Pull CAS LOW
-    gpio_put(CAS, LOW);
-
     // Set Data in pin to HIGH (write a one)
     gpio_put(D, val);
+
+    // Pull CAS LOW
+    gpio_put(CAS, LOW);
 
     sleep_us(1);
     gpio_put(WRITE, HIGH);
@@ -125,7 +141,7 @@ void read_address(int row, int col, bool *val) {
 
     // Pull RAS LOW
     gpio_put(RAS, LOW);
-    nop(); // need to wait 15 ns before setting column address
+    nop(); // need to wait 15 ns before setting column address // FIXME: pretty sure set_bus() takes longer than 15 ns...
     nop(); // need to wait 15 ns before setting column address
     nop(); // need to wait 15 ns before setting column address
     nop(); // need to wait 15 ns before setting column address
@@ -214,6 +230,23 @@ void test(bool start_val) {
         for (col = 0; col < 256; col++) {
             gpio_put(STATUS_LED, val);
             write_address(row, col, val);
+            // need to wait tW(RH) == 120 ns (in the case of 4164-20 chips) between RAS lows
+            // we probably have enough overhead but let's add a 120 ns delay anyway
+            nop(); // 8 ns each probably
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
+            nop();
             read_address(row, col, &read_val);
             if (val != read_val) {
                 printf("ERROR: row %d col %d read %d but expected %d\n", row, col, read_val, val);
